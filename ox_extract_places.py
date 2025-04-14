@@ -1,65 +1,106 @@
 import re
 import os
+import argparse 
 from collections import defaultdict
-from typing import Dict, List, Tuple, Optional, DefaultDict, Set
+from typing import Dict, List, Tuple, Optional, DefaultDict, Set, Union # Added Union
+
+try:
+    import PyPDF2
+except ImportError:
+    print("Warning: PyPDF2 library not found. PDF processing will not be available.")
+    print("Please install it using: pip install PyPDF2")
+    PyPDF2 = None 
+
+def extract_text_from_pdf(pdf_path: str) -> str | None:
+    if PyPDF2 is None:
+        print("Error: Cannot process PDF. PyPDF2 library is not installed.")
+        return None
+
+    text = ""
+    try:
+        with open(pdf_path, 'rb') as pdf_file: 
+            reader = PyPDF2.PdfReader(pdf_file)
+            num_pages = len(reader.pages)
+            print(f"Reading PDF: {pdf_path} ({num_pages} pages)")
+            for page_num in range(num_pages):
+                page = reader.pages[page_num]
+                extracted = page.extract_text()
+                if extracted: 
+                    text += extracted + "\n" 
+        print("Successfully extracted text from PDF.")
+        return text
+    except FileNotFoundError:
+        print(f"Error: PDF file not found at '{pdf_path}'")
+        return None
+    except PyPDF2.errors.PdfReadError as e:
+        print(f"Error: Could not read PDF file '{pdf_path}'. It might be corrupted, password-protected, or an invalid PDF. Details: {e}")
+        return None
+    except Exception as e:
+        print(f"An unexpected error occurred while reading PDF '{pdf_path}': {e}")
+        return None
 
 def load_captaincy_data(filepath: str) -> Dict[str, List[str]]:
     if not os.path.exists(filepath):
-        raise FileNotFoundError(f"Erro: Arquivo '{filepath}' não encontrado.")
+        raise FileNotFoundError(f"Error: Captaincy data file '{filepath}' not found.")
 
     captaincy_data: DefaultDict[str, List[str]] = defaultdict(list)
-
-    assigned_places: Set[str] = set()
+    assigned_places: Set[str] = set() 
 
     try:
+        print(f"Loading captaincy data from: {filepath}")
         with open(filepath, 'r', encoding='utf-8') as f:
             for line_num, line in enumerate(f, 1):
-                line = line.strip() 
-                if not line:
-                    continue 
+                line = line.strip()
+                if not line or line.startswith('#'): 
+                    continue
 
-                parts = line.split(',', 1)
+                parts = line.split(',', 1) 
                 if len(parts) == 2:
-                    place, captaincy = map(str.strip, parts) 
+                    place, captaincy = map(str.strip, parts)
                     if place and captaincy:
                         if place not in assigned_places:
                             captaincy_data[captaincy].append(place)
                             assigned_places.add(place)
                     else:
-                        print(f"Advertência: linha {line_num} não compilada, sem localização ou capitania -> '{line}'")
+                        print(f"Warning: Skipped line {line_num} due to missing place or captaincy: '{line}'")
                 else:
-                    print(f"Advertência: linha {line_num} não compilada, formato incorreto (formato: 'Local,Capitania') -> '{line}'")
+                    print(f"Warning: Skipped line {line_num} due to incorrect format (Expected 'Place,Captaincy'): '{line}'")
+        print(f"Successfully loaded data for {len(captaincy_data)} captaincies and {len(assigned_places)} unique places.")
 
     except IOError as e:
-        print(f"I/O erro ao ler arquivo {filepath}: {e}")
+        print(f"I/O error reading file {filepath}: {e}")
         return {} 
     except Exception as e:
-        print(f"Erro não especificado ao processar arquivo: {filepath}: {e}")
+        print(f"Unexpected error processing file {filepath}: {e}")
         return {} 
 
     if not captaincy_data:
-         print(f"Advertência: formato inválido dos dados '{filepath}'. O objeto está vazio.")
+         print(f"Warning: No valid captaincy data loaded from '{filepath}'. Resulting dictionary is empty.")
 
-    return dict(captaincy_data)
+    return dict(captaincy_data) 
 
-def search_colonial_places(text: str, captaincy_data: Dict[str, List[str]]) -> Dict:
+def search_colonial_places(text: str, captaincy_data: Dict[str, List[str]]) -> Dict[str, Union[List[Tuple[str, int]], Optional[List[str]], Dict[str, int]]]:
+    results_template = {
+        "found_places_details": [],
+        "top_captaincy": None,
+        "all_captaincy_scores": {}
+    }
+
+    if not text:
+        print("Warning: Input text is empty. Cannot perform search.")
+        return results_template
     if not captaincy_data:
-        print("Advertência: Objeto sem dados de capitanias. Sem lugares para pesquisa.")
-        return {
-            "found_places_details": [],
-            "top_captaincy": None,
-            "all_captaincy_scores": {}
-        }
+        print("Warning: Captaincy data is empty. Cannot perform search.")
+        return results_template
 
     captaincy_scores: Dict[str, int] = {cap: 0 for cap in captaincy_data}
-    
     found_places_counts: DefaultDict[str, int] = defaultdict(int)
 
     place_to_captaincy: Dict[str, str] = {}
     all_places_canonical: Set[str] = set()
-    
     lower_to_canonical_place: Dict[str, str] = {}
 
+    print("Building place lookup tables...")
     for captaincy, places in captaincy_data.items():
         for place in places:
             if place not in place_to_captaincy:
@@ -67,24 +108,23 @@ def search_colonial_places(text: str, captaincy_data: Dict[str, List[str]]) -> D
                 all_places_canonical.add(place)
                 lower_to_canonical_place[place.lower()] = place
 
-
     if not all_places_canonical:
-        print("Advertência: Sem local único nos dados.")
-        return {
-            "found_places_details": [],
-            "top_captaincy": None,
-            "all_captaincy_scores": captaincy_scores 
-        }
+        print("Warning: No unique places found in the provided captaincy data.")
+        results_template["all_captaincy_scores"] = captaincy_scores 
+        return results_template
 
     sorted_places = sorted(list(all_places_canonical), key=len, reverse=True)
-
+    
     pattern_str = r'\b(' + '|'.join(re.escape(place) for place in sorted_places) + r')\b'
+    print(f"Created regex pattern with {len(sorted_places)} places.")
 
     try:
         regex_pattern = re.compile(pattern_str, re.IGNORECASE)
 
+        print("Searching text for places...")
+
         for match in regex_pattern.finditer(text):
-            matched_text = match.group(1) 
+            matched_text = match.group(1) # The actual matched place name
 
             canonical_place = lower_to_canonical_place.get(matched_text.lower())
 
@@ -92,96 +132,138 @@ def search_colonial_places(text: str, captaincy_data: Dict[str, List[str]]) -> D
                 found_places_counts[canonical_place] += 1
 
     except re.error as e:
-        print(f"Regex error: {e}")
-        
-        print(f"Pattern (start): {pattern_str[:200]}...")
-        return {
-            "found_places_details": [],
-            "top_captaincy": None,
-            "all_captaincy_scores": captaincy_scores 
-        }
+        print(f"Regex error during pattern compilation or search: {e}")
+
+        results_template["all_captaincy_scores"] = captaincy_scores
+        return results_template
     except Exception as e:
          print(f"Unexpected error during regex search: {e}")
-         return {
-            "found_places_details": [],
-            "top_captaincy": None,
-            "all_captaincy_scores": captaincy_scores
-        }
+         results_template["all_captaincy_scores"] = captaincy_scores
+         return results_template
 
+    if not found_places_counts:
+        print("No known places found in the text.")
+        results_template["all_captaincy_scores"] = captaincy_scores
+        return results_template
+
+    print("Calculating captaincy scores...")
     for place, count in found_places_counts.items():
         captaincy = place_to_captaincy.get(place)
         if captaincy:
             captaincy_scores[captaincy] += count
 
-    top_captaincy: Optional[str] = None
+    top_captaincy: Optional[Union[str, List[str]]] = None 
     max_score = 0
     if captaincy_scores:
         positive_scores = {cap: score for cap, score in captaincy_scores.items() if score > 0}
         if positive_scores:
-            top_captaincy = max(positive_scores, key=positive_scores.get)
-            
-            max_score = positive_scores[top_captaincy]
+            max_score = max(positive_scores.values())
             tied_top_captaincies = [cap for cap, score in positive_scores.items() if score == max_score]
-            top_captaincy = tied_top_captaincies 
-            return {
-                "found_places_details": [],
-                "top_captaincy": top_captaincy,
-                "all_captaincy_scores": captaincy_scores
-            }
 
-    found_places_details_list = list(found_places_counts.items())
+            if len(tied_top_captaincies) == 1:
+                top_captaincy = tied_top_captaincies[0] 
+            else:
+                top_captaincy = sorted(tied_top_captaincies) 
+
+    found_places_details_list = sorted(list(found_places_counts.items())) 
 
     return {
         "found_places_details": found_places_details_list,
         "top_captaincy": top_captaincy,
-        "all_captaincy_scores": dict(captaincy_scores)
+        "all_captaincy_scores": dict(captaincy_scores) 
     }
 
 if __name__ == "__main__":
-    data_filepath = os.getenv('PLACES_DATA_FILE_PATH')
+    parser = argparse.ArgumentParser(
+        description="Analyze text or PDF file for mentions of colonial places and determine the top captaincy.",
+        formatter_class=argparse.RawTextHelpFormatter 
+        )
+    parser.add_argument(
+        "input_file",
+        help="Path to the input file (.txt or .pdf) to analyze."
+        )
+    parser.add_argument(
+        "data_file",
+        help="Path to the data file containing places and their captaincies.\nFormat: Each line should be 'Place Name,Captaincy Name'"
+        )
+    args = parser.parse_args()
 
-    sample_text = """
-    Document about exploration in the Captaincy of Pernambuco.
-    Trips were made to Olinda, Recife and also Goiana.
-    Later, expeditions reached the City of Bahia (Cidade da Bahia), the administrative center.
-    They also visited Vila Rica in Minas Gerais and São Paulo de Piratininga.
-    The mention of recife is important, as is olinda. Vila Rica too.
-    """
+    input_path = args.input_file
+    data_filepath = args.data_file
+    file_text = None
 
+    captaincy_place_map = {}
     try:
         captaincy_place_map = load_captaincy_data(data_filepath)
-
-        if captaincy_place_map:
-            search_results = search_colonial_places(sample_text, captaincy_place_map)
-
-            print("-" * 30)
-            print("Search Results:")
-            print("-" * 30)
-            print(f"Top Captaincy (most mentions): {search_results['top_captaincy']}")
-            print("\nDetails of Found Places:")
-            if search_results['found_places_details']:
-                sorted_details = sorted(search_results['found_places_details'], key=lambda item: item[0])
-
-                for place, count in sorted_details:
-                    print(f"- {place}: {count} time(s)")
-            else:
-                print("No known places were found in the text.")
-            print("\nTotal Score per Captaincy:")
-
-            sorted_scores = sorted(search_results['all_captaincy_scores'].items(), key=lambda item: item[1], reverse=True)
-            any_score_found = False
-
-            for captaincy, score in sorted_scores:
-                 if score > 0:
-                     print(f"- {captaincy}: {score}")
-                     any_score_found = True
-
-            if not any_score_found:
-                print("No captaincies had a score greater than zero.")
-            print("-" * 30)
-        else:
-            print("Search could not be performed because no data was loaded.")
     except FileNotFoundError as e:
         print(e)
+        exit(1) 
     except Exception as e:
-        print(f"An overall error occurred: {e}")
+        print(f"Failed to load or process captaincy data: {e}")
+        exit(1) 
+
+    if not captaincy_place_map:
+        print("Exiting: Captaincy data could not be loaded or is empty.")
+        exit(1)
+
+    print(f"\nProcessing input file: {input_path}")
+    if not os.path.exists(input_path):
+        print(f"Error: Input file not found at '{input_path}'")
+        exit(1) 
+
+    if input_path.lower().endswith(".pdf"):
+        file_text = extract_text_from_pdf(input_path)
+        if file_text is None:
+            print("Exiting: Failed to extract text from PDF.")
+            exit(1) 
+    elif input_path.lower().endswith(".txt"):
+        try:
+            with open(input_path, 'r', encoding='utf-8') as f:
+                file_text = f.read()
+            print(f"Successfully read text from '{input_path}'")
+        except Exception as e:
+            print(f"Error reading text file '{input_path}': {e}")
+            exit(1) 
+    else:
+        print(f"Error: Unsupported input file type for '{input_path}'. Please provide a .txt or .pdf file.")
+        exit(1) 
+
+    if file_text:
+        print("\n--- Resultado Pesquisa ---")
+        search_results = search_colonial_places(file_text, captaincy_place_map)
+
+        top_result = search_results['top_captaincy']
+        if top_result:
+            if isinstance(top_result, list):
+                 print(f"Ordem dos resultados encontrados: {', '.join(top_result)}")
+            else: 
+                 print(f"Top 1 Capitania: {top_result}")
+        else:
+            print("Top 1 Capitania: Sem registro.")
+
+        print("\nDetalhes dos resultados encontrados:")
+        if search_results['found_places_details']:
+            for place, count in search_results['found_places_details']:
+                print(f"- {place}: {count} vez(es)")
+        else:
+            print("No known places were found in the text.")
+
+        print("\nTotal do Score por Capitania (Score > 0):")
+        sorted_scores = sorted(
+            search_results['all_captaincy_scores'].items(),
+            key=lambda item: item[1], 
+            reverse=True
+            )
+        any_score_found = False
+        for captaincy, score in sorted_scores:
+             if score > 0:
+                 print(f"- {captaincy}: {score}")
+                 any_score_found = True
+
+        if not any_score_found:
+            print("No captaincies had a score greater than zero.")
+
+        print("-" * 30)
+    else:
+        print("\nAnalysis could not be performed as no text was loaded from the input file.")
+
