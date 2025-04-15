@@ -4,7 +4,7 @@ import argparse
 try:
     import PyPDF2 
 except ImportError:
-    print("Error: PyPDF2 library not found. Please install it using: pip install PyPDF2")
+    print("Erro: Biblioteca PyPDF2 não encontrada. Por favor, instale usando: pip install PyPDF2")
     exit(1) 
 
 def load_names_from_json(file_path: str) -> tuple[set[str], set[str], set[str]]:
@@ -17,16 +17,16 @@ def load_names_from_json(file_path: str) -> tuple[set[str], set[str], set[str]]:
         
             prepositions = set(data.get("prepositions", ["da", "das", "do", "dos", "de"]))
 
-            print(f"Successfully loaded {len(first_names)} first names, {len(second_names)} second names, and {len(prepositions)} prepositions from {file_path}")
+            print(f"Sucesso: Carregados {len(first_names)} nomes próprios, {len(second_names)} sobrenomes, e {len(prepositions)} preposições de {file_path}")
             return first_names, second_names, prepositions
     except FileNotFoundError:
-        print(f"Error: Names file not found at '{file_path}'")
+        print(f"Erro: Arquivo de nomes não encontrado em '{file_path}'")
         return set(), set(), set()
     except json.JSONDecodeError:
-        print(f"Error: Invalid JSON format in file '{file_path}'")
+        print(f"Erro: Formato JSON inválido no arquivo '{file_path}'")
         return set(), set(), set()
     except Exception as e:
-        print(f"Unexpected error loading names from '{file_path}': {e}")
+        print(f"Erro inesperado ao carregar nomes de '{file_path}': {e}")
         return set(), set(), set()
 
 def extract_text_from_pdf(pdf_path: str) -> str | None:
@@ -35,20 +35,20 @@ def extract_text_from_pdf(pdf_path: str) -> str | None:
         with open(pdf_path, 'rb') as pdf_file:
             reader = PyPDF2.PdfReader(pdf_file)
             num_pages = len(reader.pages)
-            print(f"Reading PDF: {pdf_path} ({num_pages} pages)")
+            print(f"Lendo PDF: {pdf_path} ({num_pages} páginas)")
             for page_num in range(num_pages):
                 page = reader.pages[page_num]
                 text += page.extract_text() or "" 
-        print("Successfully extracted text from PDF.")
+        print("Sucesso: Texto extraído do PDF.")
         return text
     except FileNotFoundError:
-        print(f"Error: PDF file not found at '{pdf_path}'")
+        print(f"Erro: Arquivo PDF não encontrado em '{pdf_path}'")
         return None
     except PyPDF2.errors.PdfReadError:
-        print(f"Error: Could not read PDF file '{pdf_path}'. It might be corrupted or password-protected.")
+        print(f"Erro: Não foi possível ler o arquivo PDF '{pdf_path}'. Pode estar corrompido ou protegido por senha.")
         return None
     except Exception as e:
-        print(f"An unexpected error occurred while reading PDF '{pdf_path}': {e}")
+        print(f"Erro inesperado ao ler o PDF '{pdf_path}': {e}")
         return None
 
 def extract_potential_names(
@@ -58,10 +58,10 @@ def extract_potential_names(
     prepositions: set[str]
 ) -> list[str]:
     if not text:
-        print("Warning: Input text is empty.")
+        print("Aviso: Texto de entrada está vazio.")
         return []
     if not first_names and not second_names:
-        print("Warning: Name sets are empty. Check 'names.json' or its loading process.")
+        print("Aviso: Conjuntos de nomes estão vazios. Verifique 'names.json' ou o processo de carregamento.")
         return []
 
     text_normalized = ' '.join(text.split())
@@ -110,44 +110,61 @@ def extract_potential_names(
 
 if __name__ == "__main__":
     script_dir = os.path.dirname(os.path.abspath(__file__)) if '__file__' in locals() else '.'
-    NAMES_FILE_PATH = os.path.join(script_dir, "data", "names.json") 
+    NAMES_FILE_PATH = os.path.join(script_dir, "data", "names.json")
 
     FIRST_NAMES, SECOND_NAMES, PREPOSITIONS = load_names_from_json(NAMES_FILE_PATH)
 
-    parser = argparse.ArgumentParser(description="Extract potential names from a text or PDF file.")
-    parser.add_argument("input_file", help="Path to the input file (.txt or .pdf)")
-    args = parser.parse_args()
+    parser = argparse.ArgumentParser(description="Extrai nomes potenciais de um arquivo de texto ou PDF e gera saída JSON.")
+    parser.add_argument("input_file", help="Caminho para o arquivo de entrada (.txt ou .pdf)")
+    args = parser.parse_args() 
 
     input_path = args.input_file
-    file_text = None
+    file_text = None 
+    output_data = {} 
 
     if not os.path.exists(input_path):
-        print(f"Error: Input file not found at '{input_path}'")
+        error_message = f"Erro: Arquivo de entrada não encontrado em '{input_path}'"
+        print(error_message)
+        output_data = {"status": "Erro", "message": error_message, "potential_names": []}
     elif input_path.lower().endswith(".pdf"):
         file_text = extract_text_from_pdf(input_path)
+        if file_text is None:
+             output_data = {"status": "Erro", "message": f"Falha ao extrair texto do PDF '{input_path}'.", "potential_names": []}
     elif input_path.lower().endswith(".txt"):
         try:
             with open(input_path, 'r', encoding='utf-8') as f:
                 file_text = f.read()
-            print(f"Successfully read text from '{input_path}'")
+            print(f"Sucesso: Texto lido de '{input_path}'")
         except Exception as e:
-            print(f"Error reading text file '{input_path}': {e}")
+            error_message = f"Erro ao ler arquivo de texto '{input_path}': {e}"
+            print(error_message)
+            output_data = {"status": "Erro", "message": error_message, "potential_names": []}
     else:
-        print(f"Error: Unsupported file type for '{input_path}'. Please provide a .txt or .pdf file.")
+        error_message = f"Erro: Tipo de arquivo não suportado para '{input_path}'. Forneça um arquivo .txt ou .pdf."
+        print(error_message)
+        output_data = {"status": "Erro", "message": error_message, "potential_names": []}
 
-    if file_text and (FIRST_NAMES or SECOND_NAMES):
-        print("\n--- Analysis ---")
-        potential_names = extract_potential_names(file_text, FIRST_NAMES, SECOND_NAMES, PREPOSITIONS)
+    if file_text is not None and not output_data: 
+        if FIRST_NAMES or SECOND_NAMES:
+            print("\n--- Análise ---")
+            potential_names = extract_potential_names(file_text, FIRST_NAMES, SECOND_NAMES, PREPOSITIONS)
 
-        if potential_names:
-            print("\nPotenciais Nomes encontrados:")
-            for name in potential_names:
-                print(f"- {name}")
+            output_data["potential_names"] = potential_names
+            if potential_names:
+                print(f"Sucesso: {len(potential_names)} nome(s) potencial(is) encontrado(s).")
+                output_data["status"] = "Sucesso"
+                output_data["message"] = f"{len(potential_names)} nome(s) potencial(is) encontrado(s)."
+            else:
+                print("Aviso: Nenhum nome potencial encontrado com os critérios definidos.")
+                output_data["status"] = "Aviso"
+                output_data["message"] = "Nenhum nome potencial encontrado."
         else:
-            print("\nNo potential names found matching the criteria.")
+             error_message = f"Extração não realizada: listas de nomes vazias. Verifique '{NAMES_FILE_PATH}'."
+             print(f"\n{error_message}")
+             output_data = {"status": "Erro", "message": error_message, "potential_names": []}
 
-    elif not file_text:
-        print("\nCould not extract text from the input file. Cannot perform name extraction.")
-    else: 
-        print("\nName extraction not performed because the name lists (first/second names) are empty.")
-        print(f"Please check the '{NAMES_FILE_PATH}' file and ensure it's correctly formatted and populated.")
+    print("\n--- Saída JSON ---")
+
+    json_output_string = json.dumps(output_data, indent=4, ensure_ascii=False)
+    print(json_output_string)
+    print("------------------")
