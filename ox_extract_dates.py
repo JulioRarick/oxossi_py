@@ -1,5 +1,6 @@
 import re
 import numpy as np
+import json 
 import fitz  
 import sys   
 import os  
@@ -160,23 +161,21 @@ if __name__ == "__main__":
         dating_data = extract_and_analyze_dates(extracted_text)
 
         if dating_data:
-            print("\n--- Resultados da Análise de Datas ---")
-            print(f"Anos Numéricos Diretos: {dating_data['direct_numeric_years']}")
-            print(f"Intervalos Textuais Calculados: {dating_data['calculated_textual_intervals']}")
-            print(f"Anos Combinados (Representativos): {dating_data['combined_representative_years']}")
-            print(f"Contagem Total (Combinados): {dating_data['count']}")
-            if dating_data['count'] > 0:
-                print(f"Média: {dating_data['mean']:.2f}")
-                print(f"Mediana: {dating_data['median']}")
-                print(f"Mínimo: {dating_data['minimum']}")
-                print(f"Máximo: {dating_data['maximum']}")
-                print(f"Desvio Padrão: {dating_data['standard_deviation']:.2f}")
-                print(f"Intervalo Amplo (Min-Max): {dating_data['full_range']}")
-                print(f"Intervalo Denso (Média ± DP): {dating_data['dense_range_stddev']}")
+            output_json = dating_data
+            if dating_data.get('count', 0) > 0:
+                 output_json['status'] = 'Sucesso: Datas analisadas.'
             else:
-                print("Nenhuma data relevante encontrada no texto extraído.")
-            print("------------------------------------")
+                 output_json['status'] = f"Aviso: {dating_data.get('message', 'Nenhuma data relevante encontrada.')}"
+
         else:
             print("Erro inesperado durante a análise das datas.")
-    if not extracted_text:
+            output_json = {'status': 'Erro', 'message': 'Falha na análise das datas.'}
+    else:
         print("Não foi possível extrair texto do PDF para análise.")
+        output_json = {'status': 'Erro', 'message': 'Falha ao extrair texto do PDF.'}
+
+    json_output_string = json.dumps(output_json, indent=4, ensure_ascii=False)
+  
+    print("\n--- Saída JSON ---")
+    print(json_output_string)
+    print("------------------")
