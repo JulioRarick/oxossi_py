@@ -186,7 +186,7 @@ def search_colonial_places(text: str, captaincy_data: Dict[str, List[str]]) -> D
 def main():
     parser = argparse.ArgumentParser(
         description="Analisa arquivo TXT ou PDF para menções de locais coloniais, determina a capitania principal e gera saída JSON.",
-        formatter_class=argparse.RawTextHelpFormatter # Preserva quebras de linha na ajuda
+        formatter_class=argparse.RawTextHelpFormatter
     )
     parser.add_argument(
         "input_file",

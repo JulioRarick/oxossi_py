@@ -92,7 +92,7 @@ São João do Príncipe,Ceará
 São Luís,Maranhão
 São Luís,Maranhão
 São Matheus,Espírito Santo
-São Paulo,São Paulo e Minas de Ouro
+Vila de São Paulo,São Paulo e Minas de Ouro
 São Paulo de Piratininga,São Vicente
 São Pedro del Rei,Mato Grosso
 Soure,Pará
@@ -304,8 +304,8 @@ Mogi das Cruzes,São Paulo e Minas de Ouro
 Mogi das Cruzes,São Paulo
 Nossa Senhora da Ponte de Sorocaba,São Paulo e Minas de Ouro
 Nossa Senhora da Ponte de Sorocaba,São Paulo
-Santos,São Paulo e Minas de Ouro
-Santos,São Paulo
+Vila de Santos,São Paulo e Minas de Ouro
+Vila de Santos,São Paulo
 São Jorge,Bahia
 São Sebastião,São Paulo e Minas de Ouro
 São Sebastião,São Paulo

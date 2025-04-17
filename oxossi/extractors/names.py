@@ -40,7 +40,7 @@ def extract_potential_names(
 
         if not cleaned_word:
             if current_name_parts:
-                if current_name_parts[-1].lower() not in prepositions and len(current_name_parts) >= 1:
+                if current_name_parts[-1].lower() not in prepositions and len(current_name_parts) >= 2:
                     found_names.append(" ".join(current_name_parts))
                 current_name_parts = []
             continue
@@ -68,7 +68,7 @@ def extract_potential_names(
                  current_name_parts.append(capitalized_word)
             else:
                 
-                if not last_part_was_prep and len(current_name_parts) >= 1: # Permite nomes simples
+                if not last_part_was_prep and len(current_name_parts) >= 2: 
                     found_names.append(" ".join(current_name_parts))
                 current_name_parts = []
                 
@@ -76,7 +76,7 @@ def extract_potential_names(
                     current_name_parts.append(capitalized_word)
 
     if current_name_parts:
-        if current_name_parts[-1].lower() not in prepositions and len(current_name_parts) >= 1: # Permite nomes simples
+        if current_name_parts[-1].lower() not in prepositions and len(current_name_parts) >= 2:
             found_names.append(" ".join(current_name_parts))
 
     log.info(f"Extração concluída. Encontrados {len(found_names)} nomes potenciais.")

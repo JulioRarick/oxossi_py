@@ -1,0 +1,3 @@
+# Dependencies for the Oxossi project
+numpy
+PyMuPDF 

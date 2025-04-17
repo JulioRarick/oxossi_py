@@ -4,6 +4,7 @@ import json
 import argparse
 import logging
 import os
+import sys
 from typing import Optional, Dict, List, Tuple, Any
 
 try:
@@ -183,7 +184,7 @@ def main():
     )
     parser.add_argument(
         "--config", "-c",
-        default=os.path.join(os.path.dirname(__file__), "..", "..", "data", "date_config.json"), # Caminho relativo padrão
+        default=os.path.join(os.path.dirname(__file__), "..", "..", "data", "date_config.json"),
         help="Caminho para o arquivo de configuração JSON (date_config.json)."
     )
     parser.add_argument(

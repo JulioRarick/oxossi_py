@@ -6,7 +6,6 @@ import sys
 from collections import Counter
 from typing import Optional, List, Dict, Any, Union
 
-# Importar utilitários
 try:
     from oxossi.utils.pdf_utils import extract_text_from_pdf
     from oxossi.utils.data_utils import load_themes_config
